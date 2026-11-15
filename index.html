@@ -757,7 +757,7 @@
       resetRightPanel();
     });
 
-    const gvizUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=responseHandler:handleGvizResponse`;
+    const gvizUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tq=${encodeURIComponent("SELECT * WHERE League = 'NFL'")}&tqx=responseHandler:handleGvizResponse`;
     const script = document.createElement('script');
     script.src = gvizUrl;
     document.body.appendChild(script);
