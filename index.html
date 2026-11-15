@@ -707,6 +707,9 @@
       const grouped = {};
 
       rawRows.forEach(row => {
+        const league = String(getRowVal(row, ['League']) || '').trim();
+        if (league.toUpperCase() !== 'NFL') return; // Filter strictly for NFL in JavaScript
+
         const division = String(getRowVal(row, ['Conference/Division', 'Division', 'Conference']) || '').trim();
         const team = String(getRowVal(row, ['Team', 'Team Name', 'Franchise', 'Club']) || '').trim();
         const venueName = String(getRowVal(row, ['Venue Name', 'Stadium', 'Venue']) || '').trim();
@@ -757,7 +760,7 @@
       resetRightPanel();
     });
 
-    const gvizUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tq=${encodeURIComponent("SELECT * WHERE League = 'NFL'")}&tqx=responseHandler:handleGvizResponse`;
+    const gvizUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=responseHandler:handleGvizResponse`;
     const script = document.createElement('script');
     script.src = gvizUrl;
     document.body.appendChild(script);
