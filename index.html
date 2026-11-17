@@ -331,7 +331,7 @@
       cursor: pointer;
       transition: all 0.15s ease;
       text-align: center;
-      width: 100%;
+      flex: 1;
       box-sizing: border-box;
     }
     .back-conf-btn:hover { background: #475569; color: #ffffff; }
@@ -370,7 +370,11 @@
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span>Team & Venue Details</span>
         </div>
-        <button class="back-conf-btn" id="back-to-conf-btn">&larr; Back to Divisions</button>
+        <div style="display: flex; gap: 4px; width: 100%;">
+          <button class="back-conf-btn" id="back-to-conf-btn">&larr; Back to Divisions</button>
+          <button class="back-conf-btn" id="prev-venue-btn">Previous</button>
+          <button class="back-conf-btn" id="next-venue-btn">Next</button>
+        </div>
       </div>
       <div class="panel-body" id="panel-content">
         <div class="venue-photo-container">
@@ -409,6 +413,8 @@
     const venueLayer = L.layerGroup().addTo(map);
 
     let venues = [];
+    let currentFilteredVenues = [];
+    let currentVenueIndex = -1;
     let markersMap = {}; 
     let activeDivision = null;
 
@@ -440,6 +446,7 @@
     }
 
     function resetRightPanel() {
+      currentVenueIndex = -1;
       const panelContent = document.getElementById('panel-content');
       panelContent.innerHTML = `
         <div class="venue-photo-container">
@@ -482,7 +489,13 @@
       return null;
     }
 
-    async function showVenueDetails(v) {
+    async function showVenueDetails(v, index = -1) {
+      if (index !== -1) {
+        currentVenueIndex = index;
+      } else {
+        currentVenueIndex = currentFilteredVenues.findIndex(item => item.team === v.team);
+      }
+
       const color = DIVISION_COLORS[v.division] || "#475569";
       const capacityStr = v.capacity ? Number(v.capacity).toLocaleString() : 'N/A';
       const wikiUrl = v.wikiUrl && v.wikiUrl.startsWith('http') ? v.wikiUrl : `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(v.venue + ' ' + v.team)}`;
@@ -517,7 +530,10 @@
 
       document.querySelectorAll('.school-item').forEach(el => el.classList.remove('selected-active'));
       const activeEl = document.getElementById(`school-item-${v.team.replace(/\s+/g, '_')}`);
-      if (activeEl) activeEl.classList.add('selected-active');
+      if (activeEl) {
+        activeEl.classList.add('selected-active');
+        activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
 
       const imgUrl = await fetchWikiImage(v.wikiUrl, v.venue);
       const photoBox = document.getElementById('photo-box');
@@ -594,11 +610,12 @@
 
             itemDiv.addEventListener('click', (e) => {
               e.stopPropagation();
+              const globalIdx = currentFilteredVenues.findIndex(item => item.team === v.team);
               map.flyTo(v.coords, 15, { duration: 0.8 });
               if (markersMap[v.team]) {
                 markersMap[v.team].openPopup();
               }
-              showVenueDetails(v);
+              showVenueDetails(v, globalIdx);
             });
 
             listDiv.appendChild(itemDiv);
@@ -622,7 +639,7 @@
     function updateMapFilters() {
       venueLayer.clearLayers();
       markersMap = {};
-      let visibleCount = 0;
+      currentFilteredVenues = [];
 
       venues.forEach(v => {
         let show = false;
@@ -642,15 +659,16 @@
         }
 
         if (show) {
-          visibleCount++;
+          currentFilteredVenues.push(v);
           const color = DIVISION_COLORS[v.division] || "#475569";
           const marker = L.circleMarker(v.coords, {
             radius: 6.5, fillColor: color, color: "#ffffff", weight: 1.5, opacity: 1, fillOpacity: 0.95
           }).addTo(venueLayer);
 
           marker.on('click', () => {
+            const globalIdx = currentFilteredVenues.findIndex(item => item.team === v.team);
             map.flyTo(v.coords, 15, { duration: 0.8 });
-            showVenueDetails(v);
+            showVenueDetails(v, globalIdx);
           });
 
           marker.bindTooltip(`<b>${v.team}</b>`, { direction: 'top', className: 'venue-tooltip', offset: [0, -8] });
@@ -658,7 +676,7 @@
         }
       });
 
-      document.getElementById('active-count').textContent = `${visibleCount} of ${venues.length} teams shown`;
+      document.getElementById('active-count').textContent = `${currentFilteredVenues.length} of ${venues.length} teams shown`;
       updateBasemapForZoom();
     }
 
@@ -708,7 +726,7 @@
 
       rawRows.forEach(row => {
         const league = String(getRowVal(row, ['League']) || '').trim();
-        if (league.toUpperCase() !== 'NFL') return; // Filter strictly for NFL in JavaScript
+        if (league.toUpperCase() !== 'NFL') return; 
 
         const division = String(getRowVal(row, ['Conference/Division', 'Division', 'Conference']) || '').trim();
         const team = String(getRowVal(row, ['Team', 'Team Name', 'Franchise', 'Club']) || '').trim();
@@ -754,10 +772,36 @@
     initialActiveBtn.style.background = '#0284c7';
     initialActiveBtn.style.borderColor = '#0369a1';
 
-    /* Back to Divisions listener */
+    /* Navigation Listeners */
     document.getElementById('back-to-conf-btn').addEventListener('click', () => {
       map.setView([39.8283, -98.5795], getNationalZoom());
       resetRightPanel();
+    });
+
+    document.getElementById('prev-venue-btn').addEventListener('click', () => {
+      if (currentFilteredVenues.length === 0) return;
+      if (currentVenueIndex === -1) {
+        currentVenueIndex = currentFilteredVenues.length - 1;
+      } else {
+        currentVenueIndex = (currentVenueIndex - 1 + currentFilteredVenues.length) % currentFilteredVenues.length;
+      }
+      const v = currentFilteredVenues[currentVenueIndex];
+      map.flyTo(v.coords, 15, { duration: 0.8 });
+      if (markersMap[v.team]) markersMap[v.team].openPopup();
+      showVenueDetails(v, currentVenueIndex);
+    });
+
+    document.getElementById('next-venue-btn').addEventListener('click', () => {
+      if (currentFilteredVenues.length === 0) return;
+      if (currentVenueIndex === -1) {
+        currentVenueIndex = 0;
+      } else {
+        currentVenueIndex = (currentVenueIndex + 1) % currentFilteredVenues.length;
+      }
+      const v = currentFilteredVenues[currentVenueIndex];
+      map.flyTo(v.coords, 15, { duration: 0.8 });
+      if (markersMap[v.team]) markersMap[v.team].openPopup();
+      showVenueDetails(v, currentVenueIndex);
     });
 
     const gvizUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=responseHandler:handleGvizResponse`;
